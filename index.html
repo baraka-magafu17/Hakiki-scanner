@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hakiki Scanner – Kagua Taarifa kwa AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #0e1117;
+      --paper: #f5f0e8;
+      --cream: #ede8d8;
+      --gold: #c8973a;
+      --gold-light: #e8b85a;
+      --red: #c0392b;
+      --green: #1e7e4a;
+      --blue: #1a4d8f;
+      --grey: #7a7265;
+      --border: #c8bfa8;
+      --white: #ffffff;
+    }
+
+    html, body { min-height: 100vh; background: var(--paper); font-family: 'DM Sans', sans-serif; color: var(--ink); }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ── PAGES ── */
+    .page { display: none; min-height: 100vh; }
+    .page.active { display: block; }
+
+    /* ════════════════════════════════
+       AUTH PAGE
+    ════════════════════════════════ */
+    #auth-page {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      position: relative;
+    }
+    #auth-page.active { display: flex; }
+
+    .auth-bg {
+      position: fixed; inset: 0; background: var(--ink); z-index: 0;
+      overflow: hidden;
+    }
+    .auth-bg-circle {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(200,151,58,0.12);
+    }
+    .auth-bg-circle:nth-child(1) { width: 600px; height: 600px; top: -200px; right: -200px; }
+    .auth-bg-circle:nth-child(2) { width: 400px; height: 400px; top: -100px; right: -100px; }
+    .auth-bg-circle:nth-child(3) { width: 800px; height: 800px; bottom: -400px; left: -300px; border-color: rgba(200,151,58,0.06); }
+
+    .auth-box {
+      position: relative; z-index: 1;
+      background: var(--paper);
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      width: 100%; max-width: 420px;
+      box-shadow: 8px 8px 0 rgba(200,151,58,0.3);
+      overflow: hidden;
+      animation: fadeUp 0.5s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .auth-header {
+      background: var(--ink);
+      padding: 2rem 2rem 1.5rem;
+      color: var(--paper);
+    }
+    .auth-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.2rem;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--paper);
+    }
+    .auth-logo span { color: var(--gold); }
+    .auth-logo-sub {
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #a09882;
+      margin-top: 0.3rem;
+    }
+
+    .auth-tabs {
+      display: flex;
+      border-bottom: 1.5px solid var(--border);
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--grey);
+      transition: color 0.2s, background 0.2s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1.5px;
+    }
+    .auth-tab.active {
+      color: var(--ink);
+      border-bottom-color: var(--gold);
+      background: var(--cream);
+    }
+
+    .auth-body { padding: 1.8rem 2rem 2rem; }
+
+    .auth-form { display: none; flex-direction: column; gap: 1rem; }
+    .auth-form.active { display: flex; }
+
+    .field-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--grey);
+      margin-bottom: 0.35rem;
+      display: block;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--ink);
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field-input:focus {
+      border-color: var(--ink);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    .btn-auth {
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      border: 2px solid var(--ink);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, transform 0.15s, box-shadow 0.15s;
+      margin-top: 0.3rem;
+    }
+    .btn-auth:hover:not(:disabled) {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: var(--ink);
+      transform: translate(-2px,-2px);
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+    .btn-auth:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-msg {
+      font-size: 0.84rem;
+      padding: 0.7rem 0.9rem;
+      border-radius: 2px;
+      display: none;
+    }
+    .auth-msg.error { background: #fdecea; color: var(--red); border: 1px solid #f5c6c2; display: block; }
+    .auth-msg.success { background: #e8f5ee; color: var(--green); border: 1px solid #b8dfc8; display: block; }
+
+    /* ════════════════════════════════
+       APP PAGE
+    ════════════════════════════════ */
+    #app-page { display: none; flex-direction: column; }
+    #app-page.active { display: flex; }
+
+    /* ── NAVBAR ── */
+    nav {
+      background: var(--ink);
+      border-bottom: 1px solid rgba(200,151,58,0.2);
+      padding: 0 clamp(1rem, 4vw, 3rem);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+    }
+    .nav-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--paper);
+      letter-spacing: -0.01em;
+    }
+    .nav-logo span { color: var(--gold); }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .nav-user {
+      font-size: 0.82rem;
+      color: #a09882;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn-logout {
+      padding: 0.4rem 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--paper);
+      background: transparent;
+      border: 1px solid rgba(200,151,58,0.4);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── MAIN ── */
+    .app-main {
+      position: relative; z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      width: 100%;
+      padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 1.8rem;
+      align-items: start;
+    }
+
+    @media (max-width: 720px) {
+      .app-main { grid-template-columns: 1fr; }
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      padding: 1.8rem;
+      box-shadow: 4px 4px 0 var(--cream), 4px 4px 0 1px var(--border);
+    }
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* ── TEXTAREA ── */
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      resize: vertical;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.65;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      padding: 0.9rem 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea::placeholder { color: #a09882; }
+    textarea:focus { border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+
+    .char-count { text-align: right; font-size: 0.72rem; color: var(--grey); margin-top: 0.3rem; }
+
+    .btn-scan {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.95rem;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.97rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      border: 2px solid var(--ink);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s, color 0.15s;
+    }
+    .btn-scan:hover:not(:disabled) {
+      background: var(--gold); border-color: var(--gold); color: var(--ink);
+      transform: translate(-2px,-2px); box-shadow: 4px 4px 0 var(--ink);
+    }
+    .btn-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .loading-bar {
+      height: 3px;
+      background: linear-gradient(90deg, var(--gold), var(--ink), var(--gold));
+      background-size: 200%;
+      animation: shimmer 1.4s infinite;
+      margin-top: 0.8rem; border-radius: 2px; display: none;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .loading-text { text-align: center; font-size: 0.82rem; color: var(--grey); margin-top: 0.5rem; animation: pulse 1.2s infinite; display: none; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .scan-error { background: #fdecea; border: 1px solid #f5c6c2; color: var(--red); font-size: 0.87rem; padding: 0.7rem 0.9rem; border-radius: 2px; margin-top: 0.8rem; display: none; }
+    .scan-error.show { display: block; }
+
+    /* ── RESULT ── */
+    .result-card {
+      border: 2px solid var(--ink);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 1.5rem;
+      animation: slideUp 0.35s ease;
+      display: none;
+    }
+    .result-card.show { display: block; }
+    @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+    .result-header {
+      padding: 1rem 1.4rem;
+      display: flex; align-items: center; gap: 0.8rem;
+      border-bottom: 1.5px solid var(--ink);
+    }
+    .result-header.kweli   { background: #e8f5ee; }
+    .result-header.uongo   { background: #fdecea; }
+    .result-header.shaka   { background: #fff8e6; }
+    .result-header.haijulikani { background: #eef2f8; }
+
+    .verdict-icon { font-size: 1.8rem; }
+    .verdict-badge { font-family:'Playfair Display',serif; font-size:1.3rem; font-weight:700; }
+    .verdict-badge.kweli   { color: var(--green); }
+    .verdict-badge.uongo   { color: var(--red); }
+    .verdict-badge.shaka   { color: #9a6e00; }
+    .verdict-badge.haijulikani { color: var(--blue); }
+    .verdict-sub { font-size: 0.78rem; color: var(--grey); margin-top: 2px; }
+
+    .result-body { padding: 1.4rem; background: var(--white); }
+    .result-section { margin-bottom: 1rem; }
+    .result-section:last-child { margin-bottom: 0; }
+    .result-section h4 { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--grey); margin-bottom: 0.35rem; }
+    .result-section p { font-size: 0.92rem; line-height: 1.68; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
+
+    .conf-bar-bg { height: 5px; background: var(--cream); border-radius: 3px; border: 1px solid var(--border); overflow: hidden; margin-top: 0.4rem; }
+    .conf-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(.23,1,.32,1); }
+    .conf-bar-fill.kweli { background: var(--green); }
+    .conf-bar-fill.uongo { background: var(--red); }
+    .conf-bar-fill.shaka { background: #c89500; }
+    .conf-bar-fill.haijulikani { background: var(--blue); }
+    .conf-label { font-size: 0.78rem; color: var(--grey); margin-top: 0.3rem; }
+
+    /* ── SIDEBAR ── */
+    .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 0.2rem; }
+    .stat-box {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 0.8rem;
+      text-align: center;
+    }
+    .stat-num { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; line-height: 1; }
+    .stat-num.kweli { color: var(--green); }
+    .stat-num.uongo { color: var(--red); }
+    .stat-num.shaka { color: #c89500; }
+    .stat-num.total { color: var(--ink); }
+    .stat-lbl { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--grey); margin-top: 0.2rem; }
+
+    /* ── HISTORY ── */
+    .history-list { display: flex; flex-direction: column; gap: 0.6rem; max-height: 480px; overflow-y: auto; }
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: var(--cream); }
+    .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .history-item {
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex; align-items: flex-start; gap: 0.6rem;
+    }
+    .history-item:hover { background: var(--cream); border-color: var(--ink); }
+
+    .h-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .h-dot.kweli { background: var(--green); }
+    .h-dot.uongo { background: var(--red); }
+    .h-dot.shaka { background: #c89500; }
+    .h-dot.haijulikani { background: var(--blue); }
+
+    .h-text { font-size: 0.84rem; line-height: 1.5; flex: 1; color: var(--ink); }
+    .h-meta { font-size: 0.7rem; color: var(--grey); white-space: nowrap; }
+
+    .empty-state { text-align: center; padding: 2rem 1rem; color: var(--grey); font-size: 0.88rem; font-style: italic; }
+
+    /* ── LOADING SKELETON ── */
+    .skeleton { background: linear-gradient(90deg, var(--cream) 25%, var(--border) 50%, var(--cream) 75%); background-size: 200%; animation: skelshimmer 1.2s infinite; border-radius: 2px; height: 14px; margin-bottom: 0.5rem; }
+    @keyframes skelshimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+    footer { position: relative; z-index: 1; text-align: center; padding: 1.2rem; font-size: 0.75rem; color: var(--grey); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ AUTH PAGE ═══════════════════════════ -->
+<div id="auth-page" class="page">
+  <div class="auth-bg">
+    <div class="auth-bg-circle"></div>
+    <div class="auth-bg-circle"></div>
+    <div class="auth-bg-circle"></div>
+  </div>
+  <div class="auth-box">
+    <div class="auth-header">
+      <div class="auth-logo">Hakiki<span>.</span>Scanner</div>
+      <div class="auth-logo-sub">Kagua Taarifa kwa Akili Bandia</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Ingia</button>
+      <button class="auth-tab" onclick="switchTab('register')">Jisajili</button>
+    </div>
+    <div class="auth-body">
+
+      <!-- LOGIN -->
+      <form class="auth-form active" id="login-form" onsubmit="handleLogin(event)">
+        <div>
+          <label class="field-label">Barua Pepe</label>
+          <input class="field-input" type="email" id="login-email" placeholder="mfano@gmail.com" required/>
+        </div>
+        <div>
+          <label class="field-label">Nywila</label>
+          <input class="field-input" type="password" id="login-pass" placeholder="Nywila yako" required/>
+        </div>
+        <div class="auth-msg" id="login-msg"></div>
+        <button class="btn-auth" type="submit" id="login-btn">Ingia →</button>
+      </form>
+
+      <!-- REGISTER -->
+      <form class="auth-form" id="register-form" onsubmit="handleRegister(event)">
+        <div>
+          <label class="field-label">Jina lako</label>
+          <input class="field-input" type="text" id="reg-name" placeholder="Jina kamili" required/>
+        </div>
+        <div>
+          <label class="field-label">Barua Pepe</label>
+          <input class="field-input" type="email" id="reg-email" placeholder="mfano@gmail.com" required/>
+        </div>
+        <div>
+          <label class="field-label">Nywila</label>
+          <input class="field-input" type="password" id="reg-pass" placeholder="Angalau herufi 6" minlength="6" required/>
+        </div>
+        <div class="auth-msg" id="register-msg"></div>
+        <button class="btn-auth" type="submit" id="register-btn">Jisajili →</button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ APP PAGE ═══════════════════════════ -->
+<div id="app-page" class="page">
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo">Hakiki<span>.</span>Scanner</div>
+      <div class="nav-right">
+        <div class="nav-user" id="nav-user-email">—</div>
+        <button class="btn-logout" onclick="handleLogout()">Toka</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="app-main">
+    <!-- LEFT: INPUT + RESULT -->
+    <div>
+      <div class="card">
+        <div class="card-title">🔍 Ingiza Taarifa ya Kukagua</div>
+        <textarea id="taarifa-input" placeholder="Andika au bandika taarifa, habari, au dai unalotaka kuhakiki hapa..." maxlength="1500"></textarea>
+        <div class="char-count"><span id="char-num">0</span> / 1500</div>
+        <button class="btn-scan" id="scan-btn" onclick="kagua()">⚡ Kagua Taarifa Hii</button>
+        <div class="loading-bar" id="loading-bar"></div>
+        <div class="loading-text" id="loading-text">AI inachunguza taarifa... tafadhali subiri</div>
+        <div class="scan-error" id="scan-error"></div>
+      </div>
+
+      <div class="result-card" id="result-card">
+        <div class="result-header" id="result-header">
+          <span class="verdict-icon" id="verdict-icon"></span>
+          <div>
+            <div class="verdict-badge" id="verdict-badge"></div>
+            <div class="verdict-sub" id="verdict-sub"></div>
+          </div>
+        </div>
+        <div class="result-body">
+          <div class="result-section"><h4>Uchambuzi</h4><p id="r-uchambuzi"></p></div>
+          <hr class="divider"/>
+          <div class="result-section"><h4>Sababu</h4><p id="r-sababu"></p></div>
+          <hr class="divider"/>
+          <div class="result-section"><h4>Ushauri</h4><p id="r-ushauri"></p></div>
+          <hr class="divider"/>
+          <div class="result-section">
+            <h4>Kiwango cha Uhakika</h4>
+            <div class="conf-bar-bg"><div class="conf-bar-fill" id="conf-fill" style="width:0%"></div></div>
+            <div class="conf-label" id="conf-label"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: STATS + HISTORY -->
+    <div class="sidebar">
+      <div class="card">
+        <div class="card-title">📊 Takwimu Zangu</div>
+        <div class="stats-grid">
+          <div class="stat-box"><div class="stat-num total" id="stat-total">—</div><div class="stat-lbl">Jumla</div></div>
+          <div class="stat-box"><div class="stat-num kweli" id="stat-kweli">—</div><div class="stat-lbl">Kweli</div></div>
+          <div class="stat-box"><div class="stat-num uongo" id="stat-uongo">—</div><div class="stat-lbl">Uongo</div></div>
+          <div class="stat-box"><div class="stat-num shaka" id="stat-shaka">—</div><div class="stat-lbl">Shaka</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 Historia ya Ukaguzi</div>
+        <div class="history-list" id="history-list">
+          <div class="empty-state">Bado hakuna ukaguzi uliofanywa.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Hakiki Scanner · Inayotumia Claude AI & Supabase · Tanzania 🇹🇿</footer>
+</div>
+
+<script>
+  // ── SUPABASE INIT ──
+  const SUPABASE_URL = 'https://exjwydpwzvkgjvcovcvv.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4and5ZHB3enZrZ2p2Y292Y3Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjM5NTUsImV4cCI6MjA5MDQzOTk1NX0.ad7sflaC_Xok8VxZGtXIh4VF0ot_fC5psX0ivhaX4x4';
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null;
+
+  // ── AUTH STATE ──
+  db.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      currentUser = session.user;
+      showApp();
+    } else {
+      currentUser = null;
+      showAuth();
+    }
+  });
+
+  function showAuth() {
+    document.getElementById('auth-page').classList.add('active');
+    document.getElementById('app-page').classList.remove('active');
+  }
+
+  function showApp() {
+    document.getElementById('auth-page').classList.remove('active');
+    document.getElementById('app-page').classList.add('active');
+    document.getElementById('nav-user-email').textContent = currentUser?.email || '';
+    loadHistory();
+    loadStats();
+  }
+
+  // ── TABS ──
+  function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (tab==='login'?i===0:i===1)));
+    document.getElementById('login-form').classList.toggle('active', tab==='login');
+    document.getElementById('register-form').classList.toggle('active', tab==='register');
+    clearAuthMsgs();
+  }
+
+  function clearAuthMsgs() {
+    ['login-msg','register-msg'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'auth-msg'; el.textContent = '';
+    });
+  }
+
+  // ── LOGIN ──
+  async function handleLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const msg = document.getElementById('login-msg');
+    btn.disabled = true; btn.textContent = 'Inaingia...';
+    msg.className = 'auth-msg'; msg.textContent = '';
+
+    const email = document.getElementById('login-email').value.trim();
+    const pass  = document.getElementById('login-pass').value;
+
+    const { error } = await db.auth.signInWithPassword({ email, password: pass });
+    if (error) {
+      msg.className = 'auth-msg error';
+      msg.textContent = error.message.includes('Invalid') ? 'Barua pepe au nywila si sahihi.' : error.message;
+      btn.disabled = false; btn.textContent = 'Ingia →';
+    }
+  }
+
+  // ── REGISTER ──
+  async function handleRegister(e) {
+    e.preventDefault();
+    const btn = document.getElementById('register-btn');
+    const msg = document.getElementById('register-msg');
+    btn.disabled = true; btn.textContent = 'Inajisajili...';
+    msg.className = 'auth-msg'; msg.textContent = '';
+
+    const name  = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const pass  = document.getElementById('reg-pass').value;
+
+    const { error } = await db.auth.signUp({
+      email, password: pass,
+      options: { data: { full_name: name } }
+    });
+
+    if (error) {
+      msg.className = 'auth-msg error'; msg.textContent = error.message;
+    } else {
+      msg.className = 'auth-msg success';
+      msg.textContent = 'Akaunti imeundwa! Angalia barua pepe yako kuthibitisha, au ingia moja kwa moja.';
+    }
+    btn.disabled = false; btn.textContent = 'Jisajili →';
+  }
+
+  // ── LOGOUT ──
+  async function handleLogout() {
+    await db.auth.signOut();
+  }
+
+  // ── TEXTAREA COUNTER ──
+  const textarea = document.getElementById('taarifa-input');
+  textarea.addEventListener('input', () => {
+    document.getElementById('char-num').textContent = textarea.value.length;
+  });
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) kagua();
+  });
+
+  // ── KAGUA ──
+  async function kagua() {
+    const taarifa = textarea.value.trim();
+    if (!taarifa) { showScanError('Tafadhali andika taarifa kwanza.'); return; }
+    if (taarifa.length < 15) { showScanError('Taarifa ni fupi mno. Andika sentensi kamili.'); return; }
+
+    hideScanError();
+    setLoading(true);
+
+    const system = `Wewe ni mtaalamu wa kuhakiki taarifa. Unaitwa "Hakiki Scanner". Chunguza taarifa na utoe jibu kwa JSON tu (bila maelezo mengine):
+{
+  "hukumu": "KWELI" | "UONGO" | "SHAKA" | "HAIJULIKANI",
+  "uchambuzi": "Maelezo mafupi ya taarifa hiyo (sentensi 1-2)",
+  "sababu": "Kwa nini umefika hukumu hiyo (sentensi 2-4)",
+  "ushauri": "Unamshauri nini mtumiaji (sentensi 1-2)",
+  "uhakika": 65
+}
+KWELI=inaweza kuthibitishwa, UONGO=udanganyifu wazi, SHAKA=nusu kweli, HAIJULIKANI=haiwezekani kuhakiki.
+uhakika ni nambari 30-95. Jibu kwa Kiswahili. JSON tu.`;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system,
+          messages: [{ role: "user", content: `Hakiki: "${taarifa}"` }]
+        })
+      });
+
+      const data = await res.json();
+      const text = (data.content||[]).map(i=>i.text||'').join('');
+      let parsed;
+      try {
+        parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+      } catch { throw new Error('Jibu la AI halikuweza kusomwa. Jaribu tena.'); }
+
+      setLoading(false);
+      showResult(parsed);
+      await saveToDb(taarifa, parsed);
+      loadHistory();
+      loadStats();
+
+    } catch(err) {
+      setLoading(false);
+      showScanError('Hitilafu: ' + (err.message || 'Imeshindwa. Angalia intaneti.'));
+    }
+  }
+
+  function showResult(d) {
+    const hukumu = (d.hukumu||'HAIJULIKANI').toUpperCase();
+    const cls = hukumu==='KWELI'?'kweli':hukumu==='UONGO'?'uongo':hukumu==='SHAKA'?'shaka':'haijulikani';
+    const icons = {kweli:'✅',uongo:'❌',shaka:'⚠️',haijulikani:'❓'};
+    const subs  = {kweli:'Taarifa inaonekana kuwa ya kweli',uongo:'Taarifa inaonekana kuwa ya uongo',shaka:'Taarifa ina mambo yanayotia shaka',haijulikani:'Haiwezekani kuthibitisha taarifa hii'};
+
+    document.getElementById('result-header').className = 'result-header ' + cls;
+    document.getElementById('verdict-icon').textContent = icons[cls];
+    document.getElementById('verdict-badge').textContent = hukumu;
+    document.getElementById('verdict-badge').className = 'verdict-badge ' + cls;
+    document.getElementById('verdict-sub').textContent = subs[cls];
+    document.getElementById('r-uchambuzi').textContent = d.uchambuzi||'—';
+    document.getElementById('r-sababu').textContent    = d.sababu||'—';
+    document.getElementById('r-ushauri').textContent   = d.ushauri||'—';
+
+    const pct = Math.min(95,Math.max(20,d.uhakika||60));
+    const fill = document.getElementById('conf-fill');
+    fill.className = 'conf-bar-fill ' + cls;
+    fill.style.width = '0%';
+    setTimeout(() => { fill.style.width = pct + '%'; }, 80);
+    document.getElementById('conf-label').textContent = pct + '% — ' + (pct>=75?'Uhakika mkubwa':pct>=50?'Uhakika wa wastani':'Uhakika mdogo');
+
+    const card = document.getElementById('result-card');
+    card.classList.add('show');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── SUPABASE DB ──
+  async function saveToDb(taarifa, result) {
+    if (!currentUser) return;
+    await db.from('ukaguzi').insert({
+      user_id:   currentUser.id,
+      taarifa:   taarifa.substring(0, 500),
+      hukumu:    result.hukumu,
+      uchambuzi: result.uchambuzi,
+      sababu:    result.sababu,
+      ushauri:   result.ushauri,
+      uhakika:   result.uhakika
+    });
+  }
+
+  async function loadHistory() {
+    if (!currentUser) return;
+    const list = document.getElementById('history-list');
+    list.innerHTML = '<div class="skeleton"></div><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:60%"></div>';
+
+    const { data, error } = await db
+      .from('ukaguzi')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error || !data?.length) {
+      list.innerHTML = '<div class="empty-state">Bado hakuna ukaguzi uliofanywa.</div>';
+      return;
+    }
+
+    list.innerHTML = data.map(item => {
+      const cls = item.hukumu==='KWELI'?'kweli':item.hukumu==='UONGO'?'uongo':item.hukumu==='SHAKA'?'shaka':'haijulikani';
+      const date = new Date(item.created_at).toLocaleDateString('sw-TZ',{day:'2-digit',month:'short'});
+      const preview = (item.taarifa||'').substring(0,70) + ((item.taarifa||'').length>70?'...':'');
+      return `<div class="history-item" onclick="loadTaarifa(${JSON.stringify(item.taarifa)})">
+        <div class="h-dot ${cls}"></div>
+        <div class="h-text">${preview}</div>
+        <div class="h-meta">${item.hukumu}<br/>${date}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function loadStats() {
+    if (!currentUser) return;
+    const { data } = await db.from('ukaguzi').select('hukumu').eq('user_id', currentUser.id);
+    if (!data) return;
+    const counts = { KWELI:0, UONGO:0, SHAKA:0, HAIJULIKANI:0 };
+    data.forEach(r => { if (counts[r.hukumu] !== undefined) counts[r.hukumu]++; });
+    document.getElementById('stat-total').textContent = data.length;
+    document.getElementById('stat-kweli').textContent = counts.KWELI;
+    document.getElementById('stat-uongo').textContent = counts.UONGO;
+    document.getElementById('stat-shaka').textContent = counts.SHAKA + counts.HAIJULIKANI;
+  }
+
+  function loadTaarifa(text) {
+    textarea.value = text;
+    document.getElementById('char-num').textContent = text.length;
+    textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    textarea.focus();
+  }
+
+  // ── HELPERS ──
+  function setLoading(on) {
+    const btn = document.getElementById('scan-btn');
+    btn.disabled = on;
+    btn.textContent = on ? '⏳ Inachunguza...' : '⚡ Kagua Taarifa Hii';
+    document.getElementById('loading-bar').style.display = on ? 'block' : 'none';
+    document.getElementById('loading-text').style.display = on ? 'block' : 'none';
+    if (!on) document.getElementById('result-card').classList.remove('show');
+  }
+
+  function showScanError(msg) {
+    const el = document.getElementById('scan-error');
+    el.textContent = msg; el.classList.add('show');
+  }
+  function hideScanError() {
+    document.getElementById('scan-error').classList.remove('show');
+  }
+</script>
+</body>
+</html>
