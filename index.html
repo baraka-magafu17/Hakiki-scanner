@@ -706,11 +706,36 @@ uhakika ni nambari 30-95. Jibu kwa Kiswahili. JSON tu.`;
       });
 
       const data = await res.json();
+
+      // Angalia kama API imetoa kosa
+      if (data.error) throw new Error('API: ' + (data.error.message || 'Kosa la API'));
+
       const text = (data.content||[]).map(i=>i.text||'').join('');
+
+      // Tafuta JSON ndani ya maandishi yoyote
       let parsed;
       try {
-        parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
-      } catch { throw new Error('Jibu la AI halikuweza kusomwa. Jaribu tena.'); }
+        // Jaribu 1: JSON moja kwa moja
+        const clean = text.replace(/```json|```/g,'').trim();
+        parsed = JSON.parse(clean);
+      } catch {
+        try {
+          // Jaribu 2: Tafuta { ... } ndani ya maandishi
+          const match = text.match(/\{[\s\S]*\}/);
+          if (!match) throw new Error('Hakuna JSON');
+          parsed = JSON.parse(match[0]);
+        } catch {
+          // Jaribu 3: Tengeneza jibu la msingi kutoka maandishi
+          const hukumuMatch = text.match(/KWELI|UONGO|SHAKA|HAIJULIKANI/i);
+          parsed = {
+            hukumu: hukumuMatch ? hukumuMatch[0].toUpperCase() : 'HAIJULIKANI',
+            uchambuzi: text.substring(0, 150) || 'Haiwezekani kuchambua.',
+            sababu: 'AI ilitoa jibu lisilo la kawaida.',
+            ushauri: 'Tafadhali jaribu tena na taarifa nyingine.',
+            uhakika: 40
+          };
+        }
+      }
 
       setLoading(false);
       showResult(parsed);
